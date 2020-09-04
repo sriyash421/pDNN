@@ -94,6 +94,7 @@ class Model(pl.Lightning):
         return result
 
     def log_metrics(self, result, loss, step, preds, target):
+        preds = (self.softmax(preds)>=self.threshold).float()
         result.log(f"{step}_loss", loss)
         
         if "mean_squared_error" in self.save_wt_metrics:
