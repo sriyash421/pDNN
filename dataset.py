@@ -23,7 +23,8 @@ class DatasetModule(pl.LightningDataModule):
                  cut_types,
                  test_rate,
                  val_split,
-                 batch_size)
+                 batch_size,
+                 id_dict)
     self.arr_path = arr_path
     self.run_type = run_type
     self.channel = channel
