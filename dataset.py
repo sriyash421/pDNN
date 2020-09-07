@@ -7,8 +7,10 @@ from torch.utils.data import random_split
 
 class DatasetModule(pl.LightningDataModule):
 
-    def __init__(arr_path,
+    def __init__(root_path,
+                 arr_path,
                  run_type,
+                 campaigns,
                  channel,
                  norm_array,
                  bkg_list,
@@ -24,8 +26,10 @@ class DatasetModule(pl.LightningDataModule):
                  test_rate,
                  val_split,
                  batch_size)
+    self.root_path = root_path
     self.arr_path = arr_path
     self.run_type = run_type
+    self.campaigns = campaigns
     self.channel = channel
     self.norm_array = norm_array
     self.bkg_list = bkg_list
@@ -52,6 +56,35 @@ class DatasetModule(pl.LightningDataModule):
         : store target(0/1) in a numpy array of size (total_length x 1)
         : store id similarly
         '''
+        for campaign in self.campaigns:
+            os.makedirs(f"{self.root_path}/numpy/{campaign}", exist_ok=True)
+            for sig in self.sig_list:
+                print(f"reading :{sig}.root in {campaign}")
+                events = uproot.open(f"{self.root_path}/merged/{campaign}/{sig}.root")
+                tree = events[events.keys()[0]]
+                features = tree.keys()
+                tree_pd = tree.pandas.df(features)
+                tree_np = tree_pd.to_numpy()
+                print(f"creating {sig}.npy in {campaign}")
+                np.save(f"{self.root_path}/numpy/{campaign}/{sig}.npy")
+                target = pd.DataFrame(columns = ["targets"])
+                target["target"] = np.ones(len(tree_pd))
+                print(f"creating {sig}_tf.npy in {campaign}")
+                np.save(f"{self.root_path}/numpy/{campaign}/{sig}_tf.npy", target.to_numpy())
+            for bkg in self.bkg_list:
+                print(f"reading :{bkg}.root in {campaign}")
+                events = uproot.open(f"{self.root_path}/merged/{campaign}/{bkg}.root")
+                tree = events[events.keys()[0]]
+                features = tree.keys()
+                tree_pd = tree.pandas.df(features)
+                tree_np = tree_pd.to_numpy()
+                print(f"creating {bkg}.npy in {campaign}")
+                np.save(f"{self.root_path}/numpy/{campaign}/{bkg}.npy")
+                target = pd.DataFrame(columns = ["targets"])
+                target["target"] = np.ones(len(tree_pd))
+                print(f"creating {bkg}_tf.npy in {campaign}")
+                np.save(f"{self.root_path}/numpy/{campaign}/{bkg}_tf.npy", target.to_numpy())
+
         return
 
     def setup(self, stage):
