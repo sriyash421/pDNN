@@ -52,40 +52,35 @@ class DatasetModule(pl.LightningDataModule):
         function to check data directory and read features using the channels and the arrays,
         then preprocess the data
 
-        : store data in a numpy array of size (total_length x (num_features+1)) "1" for mass
+        : store data in a numpy array of size (total_length x (num_features))
         : store target(0/1) in a numpy array of size (total_length x 1)
         : store id similarly
+
+        return:
+            sig_df: pandas of all mc signals
+            bkg_df: pandas of all mc backgrounds
+            sig_ones: a pandas df with "target" columns, containing total number of sig of ones
+            bkg_ones: a pandas df with "target" columns, containing total number of bkg of zeros
         '''
+        sig_df = pd.DataFrame()
+        bkg_df = pd.DataFrame()
         for campaign in self.campaigns:
-            os.makedirs(f"{self.root_path}/numpy/{campaign}", exist_ok=True)
             for sig in self.sig_list:
-                print(f"reading :{sig}.root in {campaign}")
                 events = uproot.open(f"{self.root_path}/merged/{campaign}/{sig}.root")
                 tree = events[events.keys()[0]]
                 features = tree.keys()
                 tree_pd = tree.pandas.df(features)
-                tree_np = tree_pd.to_numpy()
-                print(f"creating {sig}.npy in {campaign}")
-                np.save(f"{self.root_path}/numpy/{campaign}/{sig}.npy")
-                target = pd.DataFrame(columns = ["targets"])
-                target["target"] = np.ones(len(tree_pd))
-                print(f"creating {sig}_tf.npy in {campaign}")
-                np.save(f"{self.root_path}/numpy/{campaign}/{sig}_tf.npy", target.to_numpy())
+                sig_df = pd.concat([sig_df,tree_pd],ignore_index=True)
             for bkg in self.bkg_list:
-                print(f"reading :{bkg}.root in {campaign}")
                 events = uproot.open(f"{self.root_path}/merged/{campaign}/{bkg}.root")
                 tree = events[events.keys()[0]]
                 features = tree.keys()
                 tree_pd = tree.pandas.df(features)
-                tree_np = tree_pd.to_numpy()
-                print(f"creating {bkg}.npy in {campaign}")
-                np.save(f"{self.root_path}/numpy/{campaign}/{bkg}.npy")
-                target = pd.DataFrame(columns = ["targets"])
-                target["target"] = np.ones(len(tree_pd))
-                print(f"creating {bkg}_tf.npy in {campaign}")
-                np.save(f"{self.root_path}/numpy/{campaign}/{bkg}_tf.npy", target.to_numpy())
+                bkg_df = pd.concat([bkg_df,tree_pd],ignore_index=True)
+        sig_ones = pd.DataFrame({"target" : np.ones(len(sig_df))})
+        bkg_zeros = pd.DataFrame({"target" : np.zeros(len(bkg_df))})
 
-        return
+        return sig_df, bkg_df, sig_ones, bkg_zeros
 
     def setup(self, stage):
         # TODO
