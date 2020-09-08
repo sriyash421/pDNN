@@ -69,13 +69,13 @@ class DatasetModule(pl.LightningDataModule):
                 events = uproot.open(f"{self.root_path}/merged/{campaign}/{sig}.root")
                 tree = events[events.keys()[0]]
                 features = tree.keys()
-                tree_pd = tree.pandas.df(features)
+                tree_pd = tree.pandas.df(self.selected_features)
                 sig_df = pd.concat([sig_df,tree_pd],ignore_index=True)
             for bkg in self.bkg_list:
                 events = uproot.open(f"{self.root_path}/merged/{campaign}/{bkg}.root")
                 tree = events[events.keys()[0]]
                 features = tree.keys()
-                tree_pd = tree.pandas.df(features)
+                tree_pd = tree.pandas.df(self.selected_features)
                 bkg_df = pd.concat([bkg_df,tree_pd],ignore_index=True)
         sig_ones = pd.DataFrame({"target" : np.ones(len(sig_df))})
         bkg_zeros = pd.DataFrame({"target" : np.zeros(len(bkg_df))})
