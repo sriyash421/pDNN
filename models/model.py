@@ -29,7 +29,7 @@ class pDNN(nn.Module):
                     [nn.Linear(self.nodes, self.nodes), self.activation_fn, nn.Dropout(p=dropout)])
             self.modules.append(nn.Linear(self.nodes, 1))
 
-        self.model = nn.Sequential(**self.modules)
+        self.model = nn.Sequential(*self.modules)
 
     def forward(self, x):
         return self.model(x)

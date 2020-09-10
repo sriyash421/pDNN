@@ -1,25 +1,22 @@
 import os
 import torch
 import argparse
-import torch.nn.functional as F
-from torchvision.datasets import MNIST
-from torchvision import transforms
-from torch.utils.data import DataLoader
 import pytorch_lightning as pl
-from torch.utils.data import random_split
-from utils import read_config, get_early_stopper, get_checkpoint_callback, final_logs
+from utils import read_config, get_early_stopper, get_checkpoint_callback, final_logs, print_dict
 from train import Model
 from dataset import DatasetModule
+import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", default="config.ini")
-parser.add_argument("--num_gpus", type=int)
+parser.add_argument("--num_gpus", type=int, default=0)
 
-if __name__ == "main":
-    args = args.parrse_args()
+if __name__ == "__main__":
+    args = parser.parse_args()
     filename = args.config
     gpus = args.num_gpus if args.num_gpus is not None else 0
     params = read_config(filename)
+    use_gpu = (args.num_gpus > 0)
     if params["JOB_TYPE"] == "train":
         if not os.path.exists(params["SAVE_DIR"]):
             os.makedirs(params["SAVE_DIR"])
@@ -28,15 +25,15 @@ if __name__ == "main":
         if not os.path.exists(params["CHECKPOINTS_DIR"]):
             os.makedirs(params["CHECKPOINTS_DIR"])
 
-        type2id = Dict(
-            zip(params["BKG_LIST"], range(len(params["BKG_LIST"]))) +
-            zip(params["SIG_LIST"], [len(params["BKG_LIST"]]*len(parms["SIG_LIST"])))
-        )
-
-        dataset = DatasetModule(arr_path=params["ARR_PATH"],
-                                run_type=params["RUN_TYPE"],
-                                channel=params["RUN_TYPE"],
+        type2id = dict(
+            zip(params["BKG_LIST"]+params["SIG_LIST"], range(len(params["BKG_LIST"])+len(params["SIG_LIST"]))))
+        print_dict(type2id, "Types")
+        dataset = DatasetModule(root_path=params["ROOT_PATH"],
+                                campaigns=params["CAMPAIGN"],
+                                channel=params["CHANNEL"],
                                 norm_array=params["NORM_ARRAY"],
+                                sig_sum=params["SIG_SUM"],
+                                bkg_sum=params["BKG_SUM"],
                                 bkg_list=params["BKG_LIST"],
                                 sig_list=params["SIG_LIST"],
                                 data_list=params["DATA_LIST"],
@@ -45,7 +42,7 @@ if __name__ == "main":
                                 reset_feature_name=params["RESET_FEATURE_NAME"],
                                 rm_negative_weight_events=params["NEGATIVE_WT"],
                                 cut_features=params["CUT_FEATURES"],
-                                cut_values=params["CUT_TYPES"],
+                                cut_values=params["CUT_VALUES"],
                                 cut_types=params["CUT_TYPES"],
                                 test_rate=params["TEST_SPLIT"],
                                 val_split=params["VAL_SPLIT"],
@@ -54,14 +51,22 @@ if __name__ == "main":
 
         early_stopping, logger, model_checkpoint = None, None, None
         if params["EARLY_STOP"]:
-            early_stopping = get_early_stopper(monitor=params["ES_MONITOR"], min_delta=params["ES_DELTA"], patience=params["ES_PATIENCE"], mode)
+            early_stopping = get_early_stopper(monitor=params["ES_MONITOR"], min_delta=params["ES_DELTA"], patience=params["ES_PATIENCE"], mode=params["ES_MODE"])
 
         if params["SAVE_TB_LOGS"]:
-            logger = pl.loggers.TensorboardLogger(path=config["LOG_DIR"])
+            logger = pl.loggers.TensorBoardLogger(save_dir=params["LOG_DIR"], log_graph=False)
 
         if params["SAVE_MODEL"]:
             model_checkpoint = get_checkpoint_callback(
-                PATH=params["CHECKPOINTS_DIR"], monitor=params["ES_MONITOR"], save_last=config["CHECK_EPOCH"])  # TODO
+                PATH=params["CHECKPOINTS_DIR"], monitor=params["ES_MONITOR"], save_last=params["CHECK_EPOCH"])  # 
+        
+        loss_fn, output_fn = None, None
+        if params["LOSS"] == "bce_loss" :
+            loss_fn = torch.nn.BCELoss()
+            output_fn = torch.nn.Sigmoid()
+        elif params["LOSS"] == "hinge_loss" :
+            loss_fn = torch.nn.HingeLoss()
+            output_fn = torch.nn.Tanh()
 
         model = Model(momentum=params["MOMENTUM"],
                       nesterov=params["NESTEROV"],
@@ -71,29 +76,32 @@ if __name__ == "main":
                       bkg_class_weight=params["BKG_WT"],
                       threshold=params["THRESHOLD"],
                       optimizer=params["OPT"],
-                      loss_fn=params["LOSS"],
+                      loss_fn=loss_fn,
+                      output_fn=output_fn,
                       layers=params["LAYERS"],
                       nodes=params["NODES"],
-                      dropout=params["DROPOUT"]
+                      dropout=params["DROPOUT"],
                       activation=params["ACTIVATION"],
-                      input_size=len(params["FEATURES"])+1,
+                      input_size=len(params["FEATURES"]),
                       id_dict=type2id,
                       save_tb_logs=params["SAVE_TB_LOGS"],
                       save_metrics=params["METRICS"],
-                      save_wt_metric=params["WT_METRICS"])
+                      save_wt_metrics=params["WT_METRICS"])
 
         trainer = pl.Trainer(early_stop_callback=early_stopping,
-                             model_checkpoint_callback=model_checkpoint,
+                             checkpoint_callback=model_checkpoint,
                              logger=logger,
-                             max_epochs=params["EPOCHS"])
-        trainer.fit(model, dataset, gpus=gpus)
+                             max_epochs=params["EPOCHS"],
+                             gpus=gpus)
+        trainer.fit(model, dataset)
 
         test_dataset = dataset.test_dataloader()
         training_metrics = model.metrics
         best_model = pl.model.dnn
         if params["ES_RESTORE"] :
-            best_model = pl.load_from_checkpoint("")
-        final_logs()  # TODO
+            best_model = pl.load_from_checkpoint(os.path.join(params["CHECKPOINTS_DIR"], model_checkpoint.best_model_path))
+        final_logs()
 
     else:
         # TODO: jobtype = val
+        pass

@@ -1,4 +1,5 @@
-torch
 pytorch-lightning
-torchvision
+torch
+pandas
+numpy
 configparser
