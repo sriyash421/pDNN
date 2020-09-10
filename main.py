@@ -53,8 +53,8 @@ if __name__ == "__main__":
         if params["EARLY_STOP"]:
             early_stopping = get_early_stopper(monitor=params["ES_MONITOR"], min_delta=params["ES_DELTA"], patience=params["ES_PATIENCE"], mode=params["ES_MODE"])
 
-        if params["SAVE_TB_LOGS"]:
-            logger = pl.loggers.TensorBoardLogger(save_dir=params["LOG_DIR"], log_graph=False)
+        # if params["SAVE_TB_LOGS"]:
+        #     logger = pl.loggers.TensorBoardLogger(save_dir=params["LOG_DIR"], log_graph=False)
 
         if params["SAVE_MODEL"]:
             model_checkpoint = get_checkpoint_callback(
@@ -90,17 +90,18 @@ if __name__ == "__main__":
 
         trainer = pl.Trainer(early_stop_callback=early_stopping,
                              checkpoint_callback=model_checkpoint,
-                             logger=logger,
+                            #  logger=logger,
                              max_epochs=params["EPOCHS"],
                              gpus=gpus)
+        '''training the model'''
         trainer.fit(model, dataset)
 
         test_dataset = dataset.test_dataloader()
         training_metrics = model.metrics
-        best_model = pl.model.dnn
+        best_model = trainer.model.dnn
         if params["ES_RESTORE"] :
             best_model = pl.load_from_checkpoint(os.path.join(params["CHECKPOINTS_DIR"], model_checkpoint.best_model_path))
-        final_logs()
+        # final_logs()
 
     else:
         # TODO: jobtype = val

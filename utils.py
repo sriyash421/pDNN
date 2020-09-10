@@ -8,6 +8,7 @@ from datetime import datetime
 
 
 def read_config(filename="config.ini"):
+    '''read config'''
     if not os.path.exists(filename):
         raise Exception("Config file not found")
     print(f"Parsing the config file")
@@ -35,7 +36,6 @@ def read_config(filename="config.ini"):
         config["LOG_DIR"] = os.path.join(config["RESULTS_DIR"], "logs")
 
     config["ROOT_PATH"] = str(temp["root_path"])
-    print(str(temp["campaigns"]))
     config["CAMPAIGN"] = list(json.loads(str(temp["campaigns"])))
     config["CHANNEL"] = str(temp["channel"])
     config["NORM_ARRAY"] = True if temp["norm_array"] == "true" else False
@@ -56,7 +56,10 @@ def read_config(filename="config.ini"):
     config["VAL_SPLIT"] = float(temp["val_split"])
 
     config["LAYERS"] = int(temp["layers"])
-    config["NODES"] = int(temp["nodes"])
+    try :
+        config["NODES"] = json.loads(temp["nodes"])
+    except :
+        config["NODES"] = int(temp["nodes"])
     config["DROPOUT"] = float(temp["dropout_rate"])
     config["ACTIVATION"] = str(temp["activation_fn"])
     config["LOSS"] = str(temp["loss_fn"])
@@ -87,14 +90,10 @@ def read_config(filename="config.ini"):
 
 
 def print_dict(dict, name):
-    print("-"*10)
-    print(name)
+    '''print dictionaries'''
+    print("-"*40+f"{name}"+"-"*40)
     for k, v in dict.items():
-        if type(v) == list and len(v) > 0:
-            print(f"{k} \t\t\t {v} \t\t {str(type(v))} \t {str(type(v[0]))}")
-        else:
-            print(f"{k} \t\t\t {v} \t\t {str(type(v))}")
-    print("-"*10)
+        print(f"{k:<50} {v}")
 
 
 def get_early_stopper(monitor, min_delta, patience, mode):
@@ -119,6 +118,7 @@ def get_checkpoint_callback(PATH, monitor, save_last):
 
 
 def final_logs(model, dataloader, threshold, id_dict, use_gpu, training_metrics, log_path):
+    '''testing phase'''
     device = torch.device("cuda" if use_gpu else "cpu")
 
     target = torch.tensor.empty(0, 1)

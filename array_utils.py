@@ -26,7 +26,6 @@ def get_cut_index_value(array, cut_value, cut_type):
 
 
 def remove_cut_values(array, cut_features, cut_values, cut_types, features_dict):
-    print(cut_features, cut_values, cut_types)
     if len(cut_features) > 0:
         print(f"Removing cut_values")
         for (feature, cut_value, cut_type) in zip(cut_features, cut_values, cut_types):

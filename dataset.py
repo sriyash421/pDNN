@@ -150,15 +150,15 @@ class DatasetModule(pl.LightningDataModule):
             f"Final sizes: train:{train_size} val:{val_size} test_size:{test_size}")
 
     def train_dataloader(self):
-        train = DataLoader(self.train, batch_size=self.batch_size, num_workers=8)
+        train = DataLoader(self.train, batch_size=self.batch_size, num_workers=8, shuffle=True)
         return train
 
     def val_dataloader(self):
-        val = DataLoader(self.val, batch_size=self.batch_size, num_workers=8)
+        val = DataLoader(self.val, batch_size=self.batch_size, num_workers=8, shuffle=False)
         return val
 
     def test_dataloader(self):
-        test = DataLoader(self.test, batch_size=self.batch_size, num_workers=8)
+        test = DataLoader(self.test, batch_size=self.batch_size, num_workers=8, shuffle=False)
         return test
 
 # may write tests here.
