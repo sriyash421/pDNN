@@ -7,8 +7,10 @@ from torch.utils.data import random_split
 
 class DatasetModule(pl.LightningDataModule):
 
-    def __init__(arr_path,
+    def __init__(root_path,
+                 arr_path,
                  run_type,
+                 campaigns,
                  channel,
                  norm_array,
                  bkg_list,
@@ -23,10 +25,11 @@ class DatasetModule(pl.LightningDataModule):
                  cut_types,
                  test_rate,
                  val_split,
-                 batch_size,
-                 id_dict)
+                 batch_size)
+    self.root_path = root_path
     self.arr_path = arr_path
     self.run_type = run_type
+    self.campaigns = campaigns
     self.channel = channel
     self.norm_array = norm_array
     self.bkg_list = bkg_list
@@ -49,11 +52,35 @@ class DatasetModule(pl.LightningDataModule):
         function to check data directory and read features using the channels and the arrays,
         then preprocess the data
 
-        : store data in a numpy array of size (total_length x (num_features+1)) "1" for mass
+        : store data in a numpy array of size (total_length x (num_features))
         : store target(0/1) in a numpy array of size (total_length x 1)
         : store id similarly
+
+        return:
+            sig_df: pandas of all mc signals
+            bkg_df: pandas of all mc backgrounds
+            sig_ones: a pandas df with "target" columns, containing total number of sig of ones
+            bkg_ones: a pandas df with "target" columns, containing total number of bkg of zeros
         '''
-        return
+        sig_df = pd.DataFrame()
+        bkg_df = pd.DataFrame()
+        for campaign in self.campaigns:
+            for sig in self.sig_list:
+                events = uproot.open(f"{self.root_path}/merged/{campaign}/{sig}.root")
+                tree = events[events.keys()[0]]
+                features = tree.keys()
+                tree_pd = tree.pandas.df(self.selected_features)
+                sig_df = pd.concat([sig_df,tree_pd],ignore_index=True)
+            for bkg in self.bkg_list:
+                events = uproot.open(f"{self.root_path}/merged/{campaign}/{bkg}.root")
+                tree = events[events.keys()[0]]
+                features = tree.keys()
+                tree_pd = tree.pandas.df(self.selected_features)
+                bkg_df = pd.concat([bkg_df,tree_pd],ignore_index=True)
+        sig_ones = pd.DataFrame({"target" : np.ones(len(sig_df))})
+        bkg_zeros = pd.DataFrame({"target" : np.zeros(len(bkg_df))})
+
+        return sig_df, bkg_df, sig_ones, bkg_zeros
 
     def setup(self, stage):
         # TODO
