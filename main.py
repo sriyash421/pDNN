@@ -141,4 +141,4 @@ if __name__ == "__main__":
             raise Exception("Model doesnt exists")
         model = model.load_from_checkpoint(params["LOAD_DIR"])
         final_logs(model, test_dataset,
-                   params["THRESHOLD"], output_fn, type2id, gpus, training_metrics=None, params["LOG_DIR"])
+                   params["THRESHOLD"], output_fn, type2id, gpus, None, params["LOG_DIR"])
