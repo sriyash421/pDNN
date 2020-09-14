@@ -31,9 +31,9 @@ class pDNN(nn.Module):
 
         self.model = nn.Sequential(*self.modules)
         self.model.apply(self.init_weights)
-    
-    def init_weights(self, param) :
-        if type(param) == nn.Linear :
+
+    def init_weights(self, param):
+        if type(param) == nn.Linear:
             torch.nn.init.xavier_uniform_(param.weight.data)
 
     def forward(self, x):

@@ -108,7 +108,7 @@ if __name__ == "__main__":
         final_logs(best_model, test_dataset,
                    params["THRESHOLD"], output_fn, type2id, gpus, training_metrics, params["LOG_DIR"])
 
-    elif params["JOB_TYPE"]="test":
+    elif params["JOB_TYPE"] = "test":
         if not os.path.exists(params["LOG_DIR"]):
             os.makedirs(params["LOG_DIR"])
         type2id = dict(
@@ -135,10 +135,10 @@ if __name__ == "__main__":
                                 batch_size=params["BATCH_SIZE"],
                                 id_dict=type2id)
         test_dataset = dataset.test_dataloader()
-        model = pDNN(params["LAYERS"], params["NODES"],activation=params["ACTIVATION"],input_size=len(params["FEATURES"]) )
-        if os.path.exists(params["LOAD_DIR"]) :
+        model = pDNN(params["LAYERS"], params["NODES"],
+                     activation=params["ACTIVATION"], input_size=len(params["FEATURES"]))
+        if os.path.exists(params["LOAD_DIR"]):
             raise Exception("Model doesnt exists")
         model = model.load_from_checkpoint(params["LOAD_DIR"])
         final_logs(model, test_dataset,
                    params["THRESHOLD"], output_fn, type2id, gpus, training_metrics=None, params["LOG_DIR"])
-        

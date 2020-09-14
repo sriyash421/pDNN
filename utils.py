@@ -26,7 +26,8 @@ def read_config(filename="config.ini"):
     config["JOB_NAME"] = str(temp["job_name"])
     config["JOB_TYPE"] = str(temp["job_type"])
     if config["JOB_TYPE"] == "train":
-        config["SAVE_DIR"] = os.path.join(str(temp["save_dir"]), config["JOB_NAME"]+f"_{datetime.now()}".replace(" ","_"))
+        config["SAVE_DIR"] = os.path.join(
+            str(temp["save_dir"]), config["JOB_NAME"]+f"_{datetime.now()}".replace(" ", "_"))
         config["LOG_DIR"] = os.path.join(config["SAVE_DIR"], "logs")
         config["CHECKPOINTS_DIR"] = os.path.join(
             config["SAVE_DIR"], "checkpoints")
@@ -56,9 +57,9 @@ def read_config(filename="config.ini"):
     config["VAL_SPLIT"] = float(temp["val_split"])
 
     config["LAYERS"] = int(temp["layers"])
-    try :
+    try:
         config["NODES"] = json.loads(temp["nodes"])
-    except :
+    except:
         config["NODES"] = int(temp["nodes"])
     config["DROPOUT"] = float(temp["dropout_rate"])
     config["ACTIVATION"] = str(temp["activation_fn"])

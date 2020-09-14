@@ -75,7 +75,7 @@ class Model(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, scheduler_fn)
         return [optimizer], [scheduler]
 
-    def step_helper(self, batch) :
+    def step_helper(self, batch):
         inputs, target, ids = batch
         preds = self.output_fn(self(inputs).squeeze())
         loss = self.loss_fn(preds, target)
@@ -86,34 +86,39 @@ class Model(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         '''executed during training'''
         train_loss, train_acc = self.step_helper(batch)
-        return {'loss':train_loss, 'acc':train_acc}
+        return {'loss': train_loss, 'acc': train_acc}
 
     def validation_step(self, batch, batch_idx):
         '''executed during validation'''
         val_loss, val_acc = self.step_helper(batch)
-        return {'val_loss':val_loss, 'val_acc':val_acc}
+        return {'val_loss': val_loss, 'val_acc': val_acc}
 
     # TODO: Add significance as a metric
     def training_epoch_end(self, outputs):
         '''log metrics across train epoch'''
-        avg_train_loss = torch.stack([output['loss'] for output in outputs]).mean()
-        avg_train_acc = torch.stack([output['acc'] for output in outputs]).mean()
-        train_metrics = {'train_loss':avg_train_loss, 'train_acc':avg_train_acc}
+        avg_train_loss = torch.stack([output['loss']
+                                      for output in outputs]).mean()
+        avg_train_acc = torch.stack([output['acc']
+                                     for output in outputs]).mean()
+        train_metrics = {'train_loss': avg_train_loss,
+                         'train_acc': avg_train_acc}
         self.metrics['train_history_loss'].append(avg_train_loss)
         self.metrics['train_history_acc'].append(avg_train_acc)
         return {
-            'progress_bar' : train_metrics,
+            'progress_bar': train_metrics,
             'log': train_metrics
         }
 
     def validation_epoch_end(self, outputs):
         '''log metrics across val epoch'''
-        avg_val_loss = torch.stack([output['val_loss'] for output in outputs]).mean()
-        avg_val_acc = torch.stack([output['val_acc'] for output in outputs]).mean()
-        val_metrics = {'val_loss':avg_val_loss, 'val_acc':avg_val_acc}
+        avg_val_loss = torch.stack([output['val_loss']
+                                    for output in outputs]).mean()
+        avg_val_acc = torch.stack([output['val_acc']
+                                   for output in outputs]).mean()
+        val_metrics = {'val_loss': avg_val_loss, 'val_acc': avg_val_acc}
         self.metrics['val_history_loss'].append(avg_val_loss)
         self.metrics['val_history_acc'].append(avg_val_acc)
         return {
-            'progress_bar' : val_metrics,
+            'progress_bar': val_metrics,
             'log': val_metrics
         }

@@ -44,13 +44,14 @@ def norweight(weight_array, norm=1000):
     return new
 
 
-def remove_negative_weights(array) :
+def remove_negative_weights(array):
     print(f"Removing negative weights")
     new = array.copy()
     index = np.argwhere(np.sum(array < 0, axis=1) == 0)
     new = new[index.flatten(), :]
     return new
 
-def get_tensor(A,B, data_type) :
-    temp = np.concatenate((A,B), axis=0).astype(dtype=data_type)
+
+def get_tensor(A, B, data_type):
+    temp = np.concatenate((A, B), axis=0).astype(dtype=data_type)
     return torch.from_numpy(temp)

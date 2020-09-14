@@ -127,16 +127,20 @@ class DatasetModule(pl.LightningDataModule):
             self.sig[:, :-2] = norweight(self.sig[:, :-2], self.sig_sum)
             self.bkg[:, :-2] = norweight(self.bkg[:, :-2], self.bkg_sum)
 
-        self.data = np.concatenate((self.sig,self.bkg), axis=0).astype(dtype=np.float32)
+        self.data = np.concatenate(
+            (self.sig, self.bkg), axis=0).astype(dtype=np.float32)
 
         print(
             f"No. of signal samples after removing features: {self.sig.shape}")
         print(
             f"No. of background samples after removing features: {self.bkg.shape}")
 
-        target_tensor =torch.from_numpy(self.data[:,-1])# get_tensor(self.sig[:, -1], self.bkg[:, -1], data_type=np.float32)
-        id_tensor = torch.from_numpy(self.data[:,-2]) #get_tensor(self.sig[:, -2], self.bkg[:, -2], data_type=np.float32)
-        features_tensor = torch.from_numpy(self.data[:,:-2])#get_tensor(self.sig[:, :-2], self.bkg[:, :-2], data_type=np.float32)
+        # get_tensor(self.sig[:, -1], self.bkg[:, -1], data_type=np.float32)
+        target_tensor = torch.from_numpy(self.data[:, -1])
+        # get_tensor(self.sig[:, -2], self.bkg[:, -2], data_type=np.float32)
+        id_tensor = torch.from_numpy(self.data[:, -2])
+        # get_tensor(self.sig[:, :-2], self.bkg[:, :-2], data_type=np.float32)
+        features_tensor = torch.from_numpy(self.data[:, :-2])
 
         total_size = features_tensor.shape[0]
         val_size = int(total_size * self.val_split)
@@ -149,15 +153,18 @@ class DatasetModule(pl.LightningDataModule):
             f"Final sizes: train:{train_size} val:{val_size} test_size:{test_size}")
 
     def train_dataloader(self):
-        train = DataLoader(self.train, batch_size=self.batch_size, num_workers=8, shuffle=True)
+        train = DataLoader(
+            self.train, batch_size=self.batch_size, num_workers=8, shuffle=True)
         return train
 
     def val_dataloader(self):
-        val = DataLoader(self.val, batch_size=self.batch_size, num_workers=8, shuffle=False)
+        val = DataLoader(self.val, batch_size=self.batch_size,
+                         num_workers=8, shuffle=False)
         return val
 
     def test_dataloader(self):
-        test = DataLoader(self.test, batch_size=self.batch_size, num_workers=8, shuffle=False)
+        test = DataLoader(self.test, batch_size=self.batch_size,
+                          num_workers=8, shuffle=False)
         return test
 
 # may write tests here.
