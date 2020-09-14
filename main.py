@@ -108,7 +108,7 @@ if __name__ == "__main__":
         final_logs(best_model, test_dataset,
                    params["THRESHOLD"], output_fn, type2id, gpus, training_metrics, params["LOG_DIR"])
 
-    elif params["JOB_TYPE"] = "test":
+    elif params["JOB_TYPE"] == "test":
         if not os.path.exists(params["LOG_DIR"]):
             os.makedirs(params["LOG_DIR"])
         type2id = dict(
