@@ -26,7 +26,7 @@ def read_config(filename="config.ini"):
     config["JOB_NAME"] = str(temp["job_name"])
     config["JOB_TYPE"] = str(temp["job_type"])
     if config["JOB_TYPE"] == "train":
-        config["SAVE_DIR"] = os.path.join(str(temp["save_dir"]), config["JOB_NAME"]+f"_{datetime.now()}")
+        config["SAVE_DIR"] = os.path.join(str(temp["save_dir"]), config["JOB_NAME"]+f"_{datetime.now()}".replace(" ","_"))
         config["LOG_DIR"] = os.path.join(config["SAVE_DIR"], "logs")
         config["CHECKPOINTS_DIR"] = os.path.join(
             config["SAVE_DIR"], "checkpoints")
@@ -117,7 +117,7 @@ def get_checkpoint_callback(PATH, monitor, save_last):
     return checkpoint
 
 
-def final_logs(model, dataloader, threshold, id_dict, use_gpu, training_metrics, log_path):
+def final_logs(model, dataloader, threshold, output_fn, id_dict, use_gpu, training_metrics, log_path):
     '''testing phase'''
     device = torch.device("cuda" if use_gpu else "cpu")
 
@@ -127,12 +127,11 @@ def final_logs(model, dataloader, threshold, id_dict, use_gpu, training_metrics,
     ids = torch.tensor.empty(0, 1)
 
     model = model.to(device)
-    sigmoid = torch.nn.Sigmoid()
     model.eval()
 
     for (i, features, batch_target, batch_ids) in enumerate(dataloader):
         batch_scores = model(features.to(device))
-        batch_preds = (sigmoid(batch_scores) >= threshold).float()
+        batch_preds = (output_fn(batch_scores) >= threshold).float()
 
         scores = torch.cat((scores, batch_scores.cpu()))
         preds = torch.cat((preds, batch_preds.cpu()))

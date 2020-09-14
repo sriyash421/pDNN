@@ -50,14 +50,10 @@ class Model(pl.LightningModule):
         self.mse = torch.nn.MSELoss()
         self.output_fn = output_fn
         self.metrics = {
-            "train_plain_accuracy": [],
-            "train_accuracy": [],
-            "train_loss": [],
-            "train_mse_loss": [],
-            "val_plain_accuracy": [],
-            "val_accuracy": [],
-            "val_loss": [],
-            "val_mse_loss": [],
+            "train_history_acc": [],
+            "train_history_loss": [],
+            "val_history_acc": [],
+            "val_history_loss": [],
         }
         # self.save_tb_logs = save_tb_logs
 
@@ -79,97 +75,45 @@ class Model(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, scheduler_fn)
         return [optimizer], [scheduler]
 
-    def training_step(self, batch, batch_idx):
-        '''executed during training'''
+    def step_helper(self, batch) :
         inputs, target, ids = batch
         preds = self.output_fn(self(inputs).squeeze())
         loss = self.loss_fn(preds, target)
-        result = pl.TrainResult(loss)
-        result = self.log_metrics(result, loss, "train", preds, target)
-        return result
+        preds = (preds >= self.threshold).float()
+        accuracy = (preds == target).float().mean()
+        return loss, accuracy
+
+    def training_step(self, batch, batch_idx):
+        '''executed during training'''
+        train_loss, train_acc = self.step_helper(batch)
+        return {'loss':train_loss, 'acc':train_acc}
 
     def validation_step(self, batch, batch_idx):
         '''executed during validation'''
-        inputs, target, ids = batch
-        preds = self.output_fn(self(inputs).squeeze())
-        loss = self.loss_fn(preds, target)
-        result = pl.EvalResult(checkpoint_on=loss)
-        result = self.log_metrics(result, loss, "val", preds, target)
-        return result
-
-    def log_metrics(self, result, loss, step, preds, target):
-        '''log metrics per batch'''
-        preds = (preds >= self.threshold).float()
-        result.log(f"{step}_loss", loss)
-
-        if "mean_squared_error" in self.save_wt_metrics:
-            result.log(f"{step}_mse_loss", (((preds-target)**2)*(target *
-                                                                 self.sig_class_weight+(1-target)*self.bkg_class_weight)).mean())
-        if "plain_accuracy" in self.save_metrics:
-            result.log(f"{step}_plain_accuracy",
-                       (preds == target).float().mean())
-        if "accuracy" in self.save_wt_metrics:
-            result.log(f"{step}_accuracy", (((preds == target).float())*(target *
-                                                                         self.sig_class_weight+(1-target)*self.bkg_class_weight)).mean())
-        return result
+        val_loss, val_acc = self.step_helper(batch)
+        return {'val_loss':val_loss, 'val_acc':val_acc}
 
     # TODO: Add significance as a metric
     def training_epoch_end(self, outputs):
         '''log metrics across train epoch'''
-        self.log = {}
+        avg_train_loss = torch.stack([output['loss'] for output in outputs]).mean()
+        avg_train_acc = torch.stack([output['acc'] for output in outputs]).mean()
+        train_metrics = {'train_loss':avg_train_loss, 'train_acc':avg_train_acc}
+        self.metrics['train_history_loss'].append(avg_train_loss)
+        self.metrics['train_history_acc'].append(avg_train_acc)
+        return {
+            'progress_bar' : train_metrics,
+            'log': train_metrics
+        }
 
-        self.metrics["train_loss"].append(outputs["train_loss"].mean().item())
-        self.log["avg_train_loss"] = self.metrics["train_loss"][-1]
-
-        if "mean_squared_error" in self.save_wt_metrics:
-            self.metrics["train_mse_loss"].append(
-                outputs["train_mse_loss"].mean().item())
-            self.log["avg_train_mse_loss"] = self.metrics["train_mse_loss"][-1]
-
-        if "plain_accuracy" in self.save_metrics:
-            self.metrics["train_plain_accuracy"].append(
-                outputs["train_plain_accuracy"].mean().item())
-            self.log["avg_train_plain_accuracy"] = self.metrics["train_plain_accuracy"][-1]
-
-        if "accuracy" in self.save_metrics:
-            self.metrics["train_accuracy"].append(
-                outputs["train_accuracy"].mean().item())
-            self.log["avg_train_accuracy"] = self.metrics["train_accuracy"][-1]
-
-        # plot only the unweighted metrics
-        # if self.save_tb_logs:
-        #     self.logger.experiment.add_scalar(
-        #         "avg_train_loss", self.metrics["train_loss"][-1])
-        #     self.logger.experiment.add_scalar(
-        #         "avg_train_accuracy", self.metrics["train_mse_loss"][-1])
-        return {"log": self.log}
-
-    def val_epoch_end(self, outputs):
+    def validation_epoch_end(self, outputs):
         '''log metrics across val epoch'''
-        self.log = {}
-
-        self.metrics["val_loss"].append(outputs["val_loss"].mean().item())
-        self.log["avg_val_loss"] = self.metrics["val_loss"][-1]
-
-        if "mean_squared_error" in self.save_wt_metrics:
-            self.metrics["val_mse_loss"].append(
-                outputs["val_mse_loss"].mean().item())
-            self.log["avg_val_mse_loss"] = self.metrics["val_mse_loss"][-1]
-
-        if "plain_accuracy" in self.save_metrics:
-            self.metrics["val_plain_accuracy"].append(
-                outputs["val_plain_accuracy"].mean().item())
-            self.log["avg_val_plain_accuracy"] = self.metrics["val_plain_accuracy"][-1]
-
-        if "accuracy" in self.save_metrics:
-            self.metrics["val_accuracy"].append(
-                outputs["val_accuracy"].mean().item())
-            self.log["avg_val_accuracy"] = self.metrics["val_accuracy"][-1]
-
-        # plot only the unweighted metrics
-        # if self.save_tb_logs:
-        #     self.logger.experiment.add_scalar(
-        #         "avg_val_loss", self.metrics["val_loss"][-1])
-        #     self.logger.experiment.add_scalar(
-        #         "avg_val_accuracy", self.metrics["val_plain_accuracy"][-1])
-        return {"log": self.log}
+        avg_val_loss = torch.stack([output['val_loss'] for output in outputs]).mean()
+        avg_val_acc = torch.stack([output['val_acc'] for output in outputs]).mean()
+        val_metrics = {'val_loss':avg_val_loss, 'val_acc':avg_val_acc}
+        self.metrics['val_history_loss'].append(avg_val_loss)
+        self.metrics['val_history_acc'].append(avg_val_acc)
+        return {
+            'progress_bar' : val_metrics,
+            'log': val_metrics
+        }

@@ -6,6 +6,7 @@ from utils import read_config, get_early_stopper, get_checkpoint_callback, final
 from train import Model
 from dataset import DatasetModule
 import numpy as np
+from models.model import pDNN
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--config", default="config.ini")
@@ -51,20 +52,22 @@ if __name__ == "__main__":
 
         early_stopping, logger, model_checkpoint = None, None, None
         if params["EARLY_STOP"]:
-            early_stopping = get_early_stopper(monitor=params["ES_MONITOR"], min_delta=params["ES_DELTA"], patience=params["ES_PATIENCE"], mode=params["ES_MODE"])
+            early_stopping = get_early_stopper(
+                monitor=params["ES_MONITOR"], min_delta=params["ES_DELTA"], patience=params["ES_PATIENCE"], mode=params["ES_MODE"])
 
-        # if params["SAVE_TB_LOGS"]:
-        #     logger = pl.loggers.TensorBoardLogger(save_dir=params["LOG_DIR"], log_graph=False)
+        if params["SAVE_TB_LOGS"]:
+            logger = pl.loggers.TensorBoardLogger(
+                save_dir=params["LOG_DIR"], log_graph=False)
 
         if params["SAVE_MODEL"]:
             model_checkpoint = get_checkpoint_callback(
-                PATH=params["CHECKPOINTS_DIR"], monitor=params["ES_MONITOR"], save_last=params["CHECK_EPOCH"])  # 
-        
+                PATH=params["CHECKPOINTS_DIR"], monitor='val_loss', save_last=params["CHECK_EPOCH"])  #
+
         loss_fn, output_fn = None, None
-        if params["LOSS"] == "bce_loss" :
+        if params["LOSS"] == "bce_loss":
             loss_fn = torch.nn.BCELoss()
             output_fn = torch.nn.Sigmoid()
-        elif params["LOSS"] == "hinge_loss" :
+        elif params["LOSS"] == "hinge_loss":
             loss_fn = torch.nn.HingeLoss()
             output_fn = torch.nn.Tanh()
 
@@ -90,7 +93,7 @@ if __name__ == "__main__":
 
         trainer = pl.Trainer(early_stop_callback=early_stopping,
                              checkpoint_callback=model_checkpoint,
-                            #  logger=logger,
+                             logger=logger,
                              max_epochs=params["EPOCHS"],
                              gpus=gpus)
         '''training the model'''
@@ -99,10 +102,43 @@ if __name__ == "__main__":
         test_dataset = dataset.test_dataloader()
         training_metrics = model.metrics
         best_model = trainer.model.dnn
-        if params["ES_RESTORE"] :
-            best_model = pl.load_from_checkpoint(os.path.join(params["CHECKPOINTS_DIR"], model_checkpoint.best_model_path))
-        # final_logs()
+        if params["ES_RESTORE"]:
+            best_model = trainer.model.dnn.load_from_checkpoint(os.path.join(
+                params["CHECKPOINTS_DIR"], model_checkpoint.best_model_path))
+        final_logs(best_model, test_dataset,
+                   params["THRESHOLD"], output_fn, type2id, gpus, training_metrics, params["LOG_DIR"])
 
-    else:
-        # TODO: jobtype = val
-        pass
+    elif params["JOB_TYPE"]="test":
+        if not os.path.exists(params["LOG_DIR"]):
+            os.makedirs(params["LOG_DIR"])
+        type2id = dict(
+            zip(params["BKG_LIST"]+params["SIG_LIST"], range(len(params["BKG_LIST"])+len(params["SIG_LIST"]))))
+        print_dict(type2id, "Types")
+        dataset = DatasetModule(root_path=params["ROOT_PATH"],
+                                campaigns=params["CAMPAIGN"],
+                                channel=params["CHANNEL"],
+                                norm_array=params["NORM_ARRAY"],
+                                sig_sum=params["SIG_SUM"],
+                                bkg_sum=params["BKG_SUM"],
+                                bkg_list=params["BKG_LIST"],
+                                sig_list=params["SIG_LIST"],
+                                data_list=params["DATA_LIST"],
+                                selected_features=params["FEATURES"],
+                                reset_feature=params["RESET_FEATURE"],
+                                reset_feature_name=params["RESET_FEATURE_NAME"],
+                                rm_negative_weight_events=params["NEGATIVE_WT"],
+                                cut_features=params["CUT_FEATURES"],
+                                cut_values=params["CUT_VALUES"],
+                                cut_types=params["CUT_TYPES"],
+                                test_rate=1.0,
+                                val_split=0.0,
+                                batch_size=params["BATCH_SIZE"],
+                                id_dict=type2id)
+        test_dataset = dataset.test_dataloader()
+        model = pDNN(params["LAYERS"], params["NODES"],activation=params["ACTIVATION"],input_size=len(params["FEATURES"]) )
+        if os.path.exists(params["LOAD_DIR"]) :
+            raise Exception("Model doesnt exists")
+        model = model.load_from_checkpoint(params["LOAD_DIR"])
+        final_logs(model, test_dataset,
+                   params["THRESHOLD"], output_fn, type2id, gpus, training_metrics=None, params["LOG_DIR"])
+        
