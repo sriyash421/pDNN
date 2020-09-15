@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 import torch
 import numpy as np
 from datetime import datetime
+from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, log_loss
 
 
 def read_config(filename="config.ini"):
@@ -122,17 +123,17 @@ def final_logs(model, dataloader, threshold, output_fn, id_dict, use_gpu, traini
     '''testing phase'''
     device = torch.device("cuda" if use_gpu else "cpu")
 
-    target = torch.tensor.empty(0, 1)
-    preds = torch.tensor.empty(0, 1)
-    scores = torch.tensor.empty(0, 1)
-    ids = torch.tensor.empty(0, 1)
+    target = torch.empty(0)
+    preds = torch.empty(0)
+    scores = torch.empty(0)
+    ids = torch.empty(0)
 
     model = model.to(device)
     model.eval()
 
-    for (i, features, batch_target, batch_ids) in enumerate(dataloader):
-        batch_scores = model(features.to(device))
-        batch_preds = (output_fn(batch_scores) >= threshold).float()
+    for (i, (features, batch_target, batch_ids)) in enumerate(dataloader):
+        batch_scores = model(features.to(device)).detach()
+        batch_preds = (output_fn(batch_scores) >= threshold).float().detach()
 
         scores = torch.cat((scores, batch_scores.cpu()))
         preds = torch.cat((preds, batch_preds.cpu()))
@@ -153,4 +154,11 @@ def final_logs(model, dataloader, threshold, output_fn, id_dict, use_gpu, traini
         - training_metric: dictionary containing values of loss and acc during training
         #TODO: Plot required things using the above things
     """
+    test_metrics = {
+        "accuracy" : accuracy_score(target, preds),
+        "bce_loss" : log_loss(target, preds),
+        "mse_loss" : mean_squared_error(target, scores),
+        "auc_roc" : roc_auc_score(target, scores)
+    }
+    print_dict(test_metrics, "TEST RESULTS")
     return

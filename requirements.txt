@@ -4,3 +4,4 @@ pandas
 numpy
 configparser
 uproot
+scikit-learn

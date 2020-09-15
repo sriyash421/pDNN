@@ -101,11 +101,10 @@ if __name__ == "__main__":
 
         test_dataset = dataset.test_dataloader()
         training_metrics = model.metrics
-        best_model = trainer.model.dnn
+        best_model = model
         if params["ES_RESTORE"]:
-            best_model = trainer.model.dnn.load_from_checkpoint(os.path.join(
-                params["CHECKPOINTS_DIR"], model_checkpoint.best_model_path))
-        final_logs(best_model, test_dataset,
+            best_model.load_state_dict(torch.load(model_checkpoint.best_model_path)['state_dict'])
+        final_logs(best_model.dnn, test_dataset,
                    params["THRESHOLD"], output_fn, type2id, gpus, training_metrics, params["LOG_DIR"])
 
     elif params["JOB_TYPE"] == "test":
@@ -135,10 +134,11 @@ if __name__ == "__main__":
                                 batch_size=params["BATCH_SIZE"],
                                 id_dict=type2id)
         test_dataset = dataset.test_dataloader()
-        model = pDNN(params["LAYERS"], params["NODES"],
+        model = pDNN(params["LAYERS"], params["NODES"], 0.0,
                      activation=params["ACTIVATION"], input_size=len(params["FEATURES"]))
         if os.path.exists(params["LOAD_DIR"]):
             raise Exception("Model doesnt exists")
-        model = model.load_from_checkpoint(params["LOAD_DIR"])
+        model = model.load_state_dict(torch.load(
+            params["LOAD_DIR"])['state_dict']['dnn'])
         final_logs(model, test_dataset,
                    params["THRESHOLD"], output_fn, type2id, gpus, None, params["LOG_DIR"])
