@@ -18,6 +18,7 @@ if __name__ == "__main__":
     gpus = args.num_gpus if args.num_gpus is not None else 0
     params = read_config(filename)
     use_gpu = (args.num_gpus > 0)
+
     if params["JOB_TYPE"] == "train":
         if not os.path.exists(params["SAVE_DIR"]):
             os.makedirs(params["SAVE_DIR"])
@@ -109,7 +110,7 @@ if __name__ == "__main__":
 
     elif params["JOB_TYPE"] == "test":
         if not os.path.exists(params["LOG_DIR"]):
-            os.makedirs(params["LOG_DIR"])
+            raise Exception("Model doesnt exist")
         type2id = dict(
             zip(params["BKG_LIST"]+params["SIG_LIST"], range(len(params["BKG_LIST"])+len(params["SIG_LIST"]))))
         print_dict(type2id, "Types")
@@ -133,12 +134,42 @@ if __name__ == "__main__":
                                 val_split=0.0,
                                 batch_size=params["BATCH_SIZE"],
                                 id_dict=type2id)
+        early_stopping, logger, model_checkpoint = None, None, None
+
+        loss_fn, output_fn = None, None
+        if params["LOSS"] == "bce_loss":
+            loss_fn = torch.nn.BCELoss()
+            output_fn = torch.nn.Sigmoid()
+        elif params["LOSS"] == "hinge_loss":
+            loss_fn = torch.nn.HingeLoss()
+            output_fn = torch.nn.Tanh()
+
+        model = Model(momentum=params["MOMENTUM"],
+                      nesterov=params["NESTEROV"],
+                      learn_rate=params["LEARN_RATE"],
+                      learn_rate_decay=params["LR_DECAY"],
+                      sig_class_weight=params["SIG_WT"],
+                      bkg_class_weight=params["BKG_WT"],
+                      threshold=params["THRESHOLD"],
+                      optimizer=params["OPT"],
+                      loss_fn=loss_fn,
+                      output_fn=output_fn,
+                      layers=params["LAYERS"],
+                      nodes=params["NODES"],
+                      dropout=params["DROPOUT"],
+                      activation=params["ACTIVATION"],
+                      input_size=len(params["FEATURES"]),
+                      id_dict=type2id,
+                      save_tb_logs=params["SAVE_TB_LOGS"],
+                      save_metrics=params["METRICS"],
+                      save_wt_metrics=params["WT_METRICS"])
+
+        dataset.prepare_data()
+        dataset.setup()
+
         test_dataset = dataset.test_dataloader()
-        model = pDNN(params["LAYERS"], params["NODES"], 0.0,
-                     activation=params["ACTIVATION"], input_size=len(params["FEATURES"]))
-        if os.path.exists(params["LOAD_DIR"]):
-            raise Exception("Model doesnt exists")
-        model = model.load_state_dict(torch.load(
-            params["LOAD_DIR"])['state_dict']['dnn'])
+        training_metrics = model.metrics
+        model.load_state_dict(torch.load(
+            params["LOAD_DIR"])['state_dict'], strict=False)
         final_logs(model, test_dataset,
                    params["THRESHOLD"], output_fn, type2id, gpus, None, params["LOG_DIR"])
