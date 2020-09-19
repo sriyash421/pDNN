@@ -3,7 +3,7 @@ import torch
 import uproot
 import numpy as np
 import pandas as pd
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, ConcatDataset
 import pytorch_lightning as pl
 from torch.utils.data import random_split
 from array_utils import remove_cut_values, remove_negative_weights, norweight, get_tensor
@@ -135,22 +135,25 @@ class DatasetModule(pl.LightningDataModule):
         print(
             f"No. of background samples after removing features: {self.bkg.shape}")
 
-        # get_tensor(self.sig[:, -1], self.bkg[:, -1], data_type=np.float32)
-        target_tensor = torch.from_numpy(self.data[:, -1])
-        # get_tensor(self.sig[:, -2], self.bkg[:, -2], data_type=np.float32)
-        id_tensor = torch.from_numpy(self.data[:, -2])
-        # get_tensor(self.sig[:, :-2], self.bkg[:, :-2], data_type=np.float32)
-        features_tensor = torch.from_numpy(self.data[:, :-2])
+        self.bkg_train, self.bkg_val, self.bkg_test = self.split_sets(self.bkg)
+        self.sig_train, self.sig_val, self.sig_test = self.split_sets(self.sig)
+        
+        self.train = ConcatDataset(self.bkg_train, self.sig_train)
+        self.val = ConcatDataset(self.bkg_val, self.sig_val)
+        self.test = ConcatDataset(self.bkg_test, self.sig_test)
+        print(
+            f"Final sizes: train:{train_size} val:{val_size} test_size:{test_size}")
 
+    def split_sets(self, data):
+        target_tensor = torch.from_numpy(self.data[:, -1])
+        id_tensor = torch.from_numpy(self.data[:, -2])
+        features_tensor = torch.from_numpy(self.data[:, :-2])
         total_size = features_tensor.shape[0]
         val_size = int(total_size * self.val_split)
         test_size = int(total_size * self.test_rate)
         train_size = total_size - val_size - test_size
         dataset = TensorDataset(features_tensor, target_tensor, id_tensor)
-        self.train, self.val, self.test = random_split(
-            dataset, [train_size, val_size, test_size])
-        print(
-            f"Final sizes: train:{train_size} val:{val_size} test_size:{test_size}")
+        return random_split(dataset, [train_size, val_size, test_size])
 
     def train_dataloader(self):
         train = DataLoader(
