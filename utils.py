@@ -5,7 +5,8 @@ import pytorch_lightning as pl
 import torch
 import numpy as np
 from datetime import datetime
-from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, log_loss
+from sklearn.metrics import roc_auc_score, accuracy_score, mean_squared_error, log_loss, roc_curve
+import matplotlib.pyplot as plt
 
 
 def read_config(filename="config.ini"):
@@ -33,8 +34,8 @@ def read_config(filename="config.ini"):
         config["CHECKPOINTS_DIR"] = os.path.join(
             config["SAVE_DIR"], "checkpoints")
     elif config["JOB_TYPE"] == "test":
-        config["LOAD_DIR"] = str(config["load_dir"])
-        config["RESULTS_DIR"] = str(config["results_dir"])
+        config["LOAD_DIR"] = str(temp["load_dir"])
+        config["RESULTS_DIR"] = str(temp["results_dir"])
         config["LOG_DIR"] = os.path.join(config["RESULTS_DIR"], "logs")
 
     config["ROOT_PATH"] = str(temp["root_path"])
@@ -144,9 +145,10 @@ def final_logs(model, dataloader, threshold, output_fn, id_dict, use_gpu, traini
     preds = np.array(preds)
     scores = np.array(scores)
     ids = np.array(ids)
-
+    mc_sig_index = target == 1
+    mc_bkg_index = target == 0
     """[summary]
-    Here we have 
+    Here we have
         - target: array of target
         - preds: array of predictions by the model
         - scores: array of scores by the model
@@ -154,9 +156,29 @@ def final_logs(model, dataloader, threshold, output_fn, id_dict, use_gpu, traini
         - training_metric: dictionary containing values of loss and acc during training
         #TODO: Plot required things using the above things
     """
+
+    #plotting score distributon
+    false_pos_rate, true_pos_rate, _ = roc_curve(target, scores)
+    plt.subplot(2,1,1)
+    plt.title("score distribution")
+    plt.hist(scores[mc_sig_index], bins=40, label="Signal", range=[0,1], histtype=u"step")
+    plt.hist(scores[mc_bkg_index], bins=40, label="Background", range=[0,1], histtype=u"step")
+    plt.yscale("log")
+    plt.ylabel("#events")
+    plt.xlabel("prediction score")
+    plt.legend(loc="best")
+    #plotting ROC curve
+    plt.subplot(2,1,2)
+    plt.title("ROC curve")
+    plt.plot(false_pos_rate, true_pos_rate)
+    plt.xlabel("False Positive Rate"), plt.ylabel("True Positive Rate")
+    plt.text(0.8, 0.2, f"AUC = {roc_auc_score(target, scores)}", bbox=dict(facecolor="none", edgecolor="black", boxstyle="square"))
+    plt.tight_layout()
+    plt.savefig(f"{log_path}/report.png")
+
     test_metrics = {
         "accuracy" : accuracy_score(target, preds),
-        "bce_loss" : log_loss(target, preds),
+        "bce_loss" : log_loss(target, scores),
         "mse_loss" : mean_squared_error(target, scores),
         "auc_roc" : roc_auc_score(target, scores)
     }

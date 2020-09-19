@@ -110,7 +110,7 @@ class DatasetModule(pl.LightningDataModule):
         print(f"No. of signal samples: {self.sig.shape[0]}")
         print(f"No. of background samples: {self.bkg.shape[0]}")
 
-    def setup(self, stage):
+    def setup(self):
         '''
         function to create tensordatasets by splitting according to ratio and samplers
         '''
