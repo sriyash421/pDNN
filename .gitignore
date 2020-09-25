@@ -4,6 +4,7 @@ saved_models
 load_models
 .vscode
 lightning_logs
+*.ini
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

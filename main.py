@@ -166,7 +166,7 @@ if __name__ == "__main__":
                       save_wt_metrics=params["WT_METRICS"])
 
         dataset.prepare_data()
-        dataset.setup()
+        dataset.setup("test")
 
         test_dataset = dataset.test_dataloader()
         training_metrics = model.metrics
