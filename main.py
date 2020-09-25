@@ -109,7 +109,7 @@ if __name__ == "__main__":
                    params["THRESHOLD"], output_fn, type2id, gpus, training_metrics, params["LOG_DIR"])
 
     elif params["JOB_TYPE"] == "test":
-        if not os.path.exists(params["LOG_DIR"]):
+        if not os.path.exists(params["LOAD_DIR"]):
             raise Exception("Model doesnt exist")
         type2id = dict(
             zip(params["BKG_LIST"]+params["SIG_LIST"], range(len(params["BKG_LIST"])+len(params["SIG_LIST"]))))
@@ -165,7 +165,7 @@ if __name__ == "__main__":
                       save_wt_metrics=params["WT_METRICS"])
 
         dataset.prepare_data()
-        dataset.setup()
+        dataset.setup("test")
 
         test_dataset = dataset.test_dataloader()
         training_metrics = model.metrics

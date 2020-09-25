@@ -133,8 +133,8 @@ def final_logs(model, dataloader, threshold, output_fn, id_dict, use_gpu, traini
     model.eval()
 
     for (i, (features, batch_target, batch_ids)) in enumerate(dataloader):
-        batch_scores = model(features.to(device)).detach()
-        batch_preds = (output_fn(batch_scores) >= threshold).float().detach()
+        batch_scores = output_fn(model(features.to(device)).detach())
+        batch_preds = (batch_scores >= threshold).float().detach()
 
         scores = torch.cat((scores, batch_scores.cpu()))
         preds = torch.cat((preds, batch_preds.cpu()))
@@ -142,6 +142,7 @@ def final_logs(model, dataloader, threshold, output_fn, id_dict, use_gpu, traini
         ids = torch.cat((ids, batch_ids.cpu()))
 
     target = np.array(target)
+    print(f"Signal: {np.sum(target)} Bkg: {target.shape[0]-np.sum(target)} ")
     preds = np.array(preds)
     scores = np.array(scores)
     ids = np.array(ids)
@@ -175,7 +176,7 @@ def final_logs(model, dataloader, threshold, output_fn, id_dict, use_gpu, traini
     plt.text(0.8, 0.2, f"AUC = {roc_auc_score(target, scores)}", bbox=dict(facecolor="none", edgecolor="black", boxstyle="square"))
     plt.tight_layout()
     plt.savefig(f"{log_path}/report.png")
-
+    print(f"{target}\n{scores}")
     test_metrics = {
         "accuracy" : accuracy_score(target, preds),
         "bce_loss" : log_loss(target, scores),

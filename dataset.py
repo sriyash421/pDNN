@@ -110,7 +110,7 @@ class DatasetModule(pl.LightningDataModule):
         print(f"No. of signal samples: {self.sig.shape[0]}")
         print(f"No. of background samples: {self.bkg.shape[0]}")
 
-    def setup(self):
+    def setup(self, stage):
         '''
         function to create tensordatasets by splitting according to ratio and samplers
         '''
@@ -138,16 +138,17 @@ class DatasetModule(pl.LightningDataModule):
         self.bkg_train, self.bkg_val, self.bkg_test = self.split_sets(self.bkg)
         self.sig_train, self.sig_val, self.sig_test = self.split_sets(self.sig)
         
-        self.train = ConcatDataset(self.bkg_train, self.sig_train)
-        self.val = ConcatDataset(self.bkg_val, self.sig_val)
-        self.test = ConcatDataset(self.bkg_test, self.sig_test)
+        self.train = ConcatDataset([self.bkg_train, self.sig_train])
+        self.val = ConcatDataset([self.bkg_val, self.sig_val])
+        self.test = ConcatDataset([self.bkg_test, self.sig_test])
         print(
-            f"Final sizes: train:{train_size} val:{val_size} test_size:{test_size}")
+            f"Final sizes: train:{len(self.train)} val:{len(self.val)} test_size:{len(self.test)}")
 
     def split_sets(self, data):
-        target_tensor = torch.from_numpy(self.data[:, -1])
-        id_tensor = torch.from_numpy(self.data[:, -2])
-        features_tensor = torch.from_numpy(self.data[:, :-2])
+        data = np.array(data, dtype=np.float32)
+        target_tensor = torch.from_numpy(data[:, -1])
+        id_tensor = torch.from_numpy(data[:, -2])
+        features_tensor = torch.from_numpy(data[:, :-2])
         total_size = features_tensor.shape[0]
         val_size = int(total_size * self.val_split)
         test_size = int(total_size * self.test_rate)
