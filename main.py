@@ -110,7 +110,8 @@ if __name__ == "__main__":
 
     elif params["JOB_TYPE"] == "test":
         if not os.path.exists(params["LOG_DIR"]):
-            raise Exception("Model doesnt exist")
+            os.makedirs(params["LOG_DIR"])
+            # raise Exception("Model doesnt exist")
         type2id = dict(
             zip(params["BKG_LIST"]+params["SIG_LIST"], range(len(params["BKG_LIST"])+len(params["SIG_LIST"]))))
         print_dict(type2id, "Types")
@@ -130,7 +131,7 @@ if __name__ == "__main__":
                                 cut_features=params["CUT_FEATURES"],
                                 cut_values=params["CUT_VALUES"],
                                 cut_types=params["CUT_TYPES"],
-                                test_rate=1.0,
+                                test_rate=params["TEST_SPLIT"],
                                 val_split=0.0,
                                 batch_size=params["BATCH_SIZE"],
                                 id_dict=type2id)
