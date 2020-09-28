@@ -37,6 +37,14 @@ def read_config(filename="config.ini"):
         config["LOAD_DIR"] = str(temp["load_dir"])
         config["RESULTS_DIR"] = str(temp["results_dir"])
         config["LOG_DIR"] = os.path.join(config["RESULTS_DIR"], "logs")
+        
+    elif config["JOB_TYPE"] == "missing_mass_train":
+        config["SAVE_DIR"] = os.path.join(
+            str(temp["save_dir"]), config["JOB_NAME"]+f"_{datetime.now()}".replace(" ", "_"))
+        config["LOG_DIR"] = os.path.join(config["SAVE_DIR"], "logs")
+        config["CHECKPOINTS_DIR"] = os.path.join(
+            config["SAVE_DIR"], "checkpoints")
+
 
     config["ROOT_PATH"] = str(temp["root_path"])
     config["CAMPAIGN"] = list(json.loads(str(temp["campaigns"])))
@@ -57,6 +65,9 @@ def read_config(filename="config.ini"):
     config["CUT_TYPES"] = list(json.loads(str(temp["cut_types"])))
     config["TEST_SPLIT"] = float(temp["test_rate"])
     config["VAL_SPLIT"] = float(temp["val_split"])
+
+    config["TRAIN_SIG_LIST"] = list(json.loads(temp["train_sig_list"]))
+    config["MISSING_LIST"] = list(json.loads(temp["miss_sig_list"]))
 
     config["LAYERS"] = int(temp["layers"])
     try:
