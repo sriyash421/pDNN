@@ -8,7 +8,7 @@ import pytorch_lightning as pl
 from torch.utils.data import random_split
 from array_utils import remove_cut_values, remove_negative_weights, norweight, get_tensor
 from utils import print_dict
-
+from sklearn.decomposition import PCA 
 
 class DatasetModule(pl.LightningDataModule):
 
@@ -31,7 +31,11 @@ class DatasetModule(pl.LightningDataModule):
                  test_rate,
                  val_split,
                  batch_size,
-                 id_dict):
+                 id_dict,
+                 missing_train,
+                 missing_sig,
+                 use_PCA,
+                 pca_components):
         super().__init__()
         self.root_path = root_path
         self.campaigns = campaigns
@@ -56,6 +60,24 @@ class DatasetModule(pl.LightningDataModule):
         self.features_dict = dict(
             zip(self.selected_features, range(len(self.selected_features))))
         print_dict(self.features_dict, "Features")
+        self.missing_sig = missing_sig
+        self.missing_train = missing_train
+        if self.missing_train :
+            self.sig_list = [i for i in self.sig_list if i not in missing_sig]
+        self.use_PCA = use_PCA
+        self.pca_components = pca_components
+    
+    def read_data(self, class_list, campaign, df, id_df) :
+        for class_type in class_list :
+            events = uproot.open(
+                        f"{self.root_path}/merged/{campaign}/{class_type}.root")
+            tree = events[events.keys()[0]]
+            features = tree.keys()
+            tree_pd = tree.pandas.df(self.selected_features)
+            df = pd.concat([df, tree_pd], ignore_index=True)
+            id_df = pd.concat([id_df, pd.DataFrame(
+                {"id": np.ones(len(tree_pd))*self.id_dict[class_type]})])
+        return df, id_df
 
     def prepare_data(self):
         '''
@@ -78,69 +100,103 @@ class DatasetModule(pl.LightningDataModule):
 
         sig_id = pd.DataFrame()
         bkg_id = pd.DataFrame()
+        
+        missing_df = pd.DataFrame()
+        missing_id = pd.DataFrame()
 
         for campaign in self.campaigns:
             print(f"Reading campaign: {campaign}...")
-            for sig in self.sig_list:
-                events = uproot.open(
-                    f"{self.root_path}/merged/{campaign}/{sig}.root")
-                tree = events[events.keys()[0]]
-                features = tree.keys()
-                tree_pd = tree.pandas.df(self.selected_features)
-                sig_df = pd.concat([sig_df, tree_pd], ignore_index=True)
-                sig_id = pd.concat([sig_id, pd.DataFrame(
-                    {"id": np.ones(len(tree_pd))*self.id_dict[sig]})])
-            for bkg in self.bkg_list:
-                events = uproot.open(
-                    f"{self.root_path}/merged/{campaign}/{bkg}.root")
-                tree = events[events.keys()[0]]
-                features = tree.keys()
-                tree_pd = tree.pandas.df(self.selected_features)
-                bkg_df = pd.concat([bkg_df, tree_pd], ignore_index=True)
-                bkg_id = pd.concat([bkg_id, pd.DataFrame(
-                    {"id": np.ones(len(tree_pd))*self.id_dict[bkg]})])
+            sig_df, sig_id = self.read_data(self.sig_list, campaign, sig_df, sig_id)
+            bkg_df, bkg_id = self.read_data(self.bkg_list, campaign, bkg_df, bkg_id)
+            if self.missing_train :
+                missing_df, missing_id = self.read_data(self.missing_sig, campaign, missing_df, missing_id)
         sig_ones = pd.DataFrame({"target": np.ones(len(sig_df))})
         bkg_zeros = pd.DataFrame({"target": np.zeros(len(bkg_df))})
-
-        self.sig = np.concatenate(
-            (sig_df.to_numpy(), sig_id.to_numpy(), sig_ones.to_numpy()), axis=1)
-        self.bkg = np.concatenate(
-            (bkg_df.to_numpy(), bkg_id.to_numpy(), bkg_zeros.to_numpy()), axis=1)
+        missing_ones = pd.DataFrame({"target": np.ones(len(missing_df))})
+        if self.use_PCA :
+            print("Applying PCA...")
+            pca = PCA(n_components=self.pca_components,whiten=True)
+            temp_sig = pca.fit_transform(sig_df.to_numpy())
+            temp_bkg = pca.fit_transform(bkg_df.to_numpy())
+            if self.missing_train :
+                temp_missing = pca.fit_transform(missing_df.to_numpy())
+            else:
+                temp_missing = missing_df.to_numpy()
+            print(f"After PCA size: sig:{temp_sig.shape} bkg:{temp_bkg.shape} missing:{temp_missing.shape}")
+            self.sig = np.concatenate(
+                (temp_sig, sig_id.to_numpy(), sig_ones.to_numpy()), axis=1)
+            self.bkg = np.concatenate(
+                (temp_bkg, bkg_id.to_numpy(), bkg_zeros.to_numpy()), axis=1)
+            self.missing = np.concatenate(
+                (temp_missing, missing_id.to_numpy(), missing_ones.to_numpy()), axis=1)
+        else :
+            self.sig = np.concatenate(
+                (sig_df.to_numpy(), sig_id.to_numpy(), sig_ones.to_numpy()), axis=1)
+            self.bkg = np.concatenate(
+                (bkg_df.to_numpy(), bkg_id.to_numpy(), bkg_zeros.to_numpy()), axis=1)
+            self.missing = np.concatenate(
+                (missing_df.to_numpy(), missing_id.to_numpy(), missing_ones.to_numpy()), axis=1)
 
         print(f"No. of signal samples: {self.sig.shape[0]}")
         print(f"No. of background samples: {self.bkg.shape[0]}")
+        if self.missing_train :
+            print(f"No. of signal samples missing: {self.missing.shape[0]}")
+            self.bkg_test_rate = float(self.missing.shape[0])/float(self.sig.shape[0]+self.missing.shape[0])
+            self.bkg_val_split = float(self.sig.shape[0]*self.val_split)/float(self.sig.shape[0]+self.missing.shape[0])
 
     def setup(self, stage):
         '''
         function to create tensordatasets by splitting according to ratio and samplers
         '''
-        self.sig = remove_cut_values(
-            self.sig, self.cut_features, self.cut_values, self.cut_types, self.features_dict)
-        self.bkg = remove_cut_values(
-            self.bkg, self.cut_features, self.cut_values, self.cut_types, self.features_dict)
+        if not self.use_PCA :
+            self.sig = remove_cut_values(
+                self.sig, self.cut_features, self.cut_values, self.cut_types, self.features_dict)
+            self.bkg = remove_cut_values(
+                self.bkg, self.cut_features, self.cut_values, self.cut_types, self.features_dict)
+            if self.missing_train :
+                self.missing = remove_cut_values(
+                    self.missing, self.cut_features, self.cut_values, self.cut_types, self.features_dict)
 
-        if self.rm_negative_weight_events:
-            self.sig = remove_negative_weights(self.sig)
-            self.bkg = remove_negative_weights(self.bkg)
+            if self.rm_negative_weight_events:
+                self.sig = remove_negative_weights(self.sig)
+                self.bkg = remove_negative_weights(self.bkg)
+                if self.missing_train :
+                    self.missing = remove_negative_weights(self.missing)
 
-        if self.norm_array:
-            self.sig[:, :-2] = norweight(self.sig[:, :-2], self.sig_sum)
-            self.bkg[:, :-2] = norweight(self.bkg[:, :-2], self.bkg_sum)
+            if self.norm_array:
+                self.sig[:, :-2] = norweight(self.sig[:, :-2], self.sig_sum)
+                self.bkg[:, :-2] = norweight(self.bkg[:, :-2], self.bkg_sum)
+                if self.missing_train :
+                    self.missing[:, :-2] = norweight(self.missing[:, :-2], 1000.0)
 
-        self.data = np.concatenate(
-            (self.sig, self.bkg), axis=0).astype(dtype=np.float32)
+        # self.data = np.concatenate(
+        #     (self.sig, self.bkg), axis=0).astype(dtype=np.float32)
 
         print(
             f"No. of signal samples after removing features: {self.sig.shape}")
         print(
             f"No. of background samples after removing features: {self.bkg.shape}")
 
+        if self.missing_train :
+            print("Check for missing values..")
+            assert((np.all(self.missing[:,-2]==self.missing[0,-2]) and np.all(self.sig[:,-2] != self.missing[0,-2])))
+            self.test_rate = 0.0
+            self.sig_train, self.sig_val, _ = self.split_sets(self.sig)
+            self.val_split = 0.0
+            print("Splitting for missing signal values..")
+            self.sig_test, _, _ = self.split_sets(self.missing)
+        else :
+            self.sig_train, self.sig_val, self.sig_test = self.split_sets(self.sig)
+        if self.missing_train :
+            self.test_rate, self.val_split = self.bkg_test_rate, self.bkg_val_split
         self.bkg_train, self.bkg_val, self.bkg_test = self.split_sets(self.bkg)
-        self.sig_train, self.sig_val, self.sig_test = self.split_sets(self.sig)
-        
         self.train = ConcatDataset([self.bkg_train, self.sig_train])
         self.val = ConcatDataset([self.bkg_val, self.sig_val])
         self.test = ConcatDataset([self.bkg_test, self.sig_test])
+        # print(
+        #     f"Sig sizes: train:{len(self.sig_train)/(self.sig.shape[0]+self.missing.shape[0])} val:{len(self.sig_val)/(self.sig.shape[0]+self.missing.shape[0])} test_size:{len(self.sig_test)/(self.sig.shape[0]+self.missing.shape[0])}")
+        # print(
+        #     f"Bkg sizes: train:{len(self.bkg_train)/self.bkg.shape[0]} val:{len(self.bkg_val)/self.bkg.shape[0]} test_size:{len(self.bkg_test)/self.bkg.shape[0]}")
         print(
             f"Final sizes: train:{len(self.train)} val:{len(self.val)} test_size:{len(self.test)}")
 

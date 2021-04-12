@@ -47,6 +47,8 @@ def read_config(filename="config.ini"):
 
     config["BKG_LIST"] = list(json.loads(temp["bkg_list"]))
     config["SIG_LIST"] = list(json.loads(temp["sig_list"]))
+    config["MISSING_TRAIN"] = True if temp["train_with_missing"] == "true" else False
+    config["MISSING_SIG"] = list(json.loads(temp["missing_sig"]))
     config["DATA_LIST"] = list(json.loads(temp["data_list"]))
     config["FEATURES"] = list(json.loads(temp["selected_features"]))
     config["RESET_FEATURE"] = True if temp["reset_feature"] == "true" else False
@@ -55,6 +57,8 @@ def read_config(filename="config.ini"):
     config["CUT_FEATURES"] = list(json.loads(str(temp["cut_features"])))
     config["CUT_VALUES"] = list(json.loads(temp["cut_values"]))
     config["CUT_TYPES"] = list(json.loads(str(temp["cut_types"])))
+    config["USE_PCA"] = True if temp["use_pca"] == "true" else False
+    config["PCA_COMPONENTS"] = int(temp["pca_components"])
     config["TEST_SPLIT"] = float(temp["test_rate"])
     config["VAL_SPLIT"] = float(temp["val_split"])
 

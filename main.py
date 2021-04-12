@@ -26,10 +26,14 @@ if __name__ == "__main__":
             os.makedirs(params["LOG_DIR"])
         if not os.path.exists(params["CHECKPOINTS_DIR"]):
             os.makedirs(params["CHECKPOINTS_DIR"])
-
+        
         type2id = dict(
             zip(params["BKG_LIST"]+params["SIG_LIST"], range(len(params["BKG_LIST"])+len(params["SIG_LIST"]))))
+        if params["MISSING_TRAIN"] :
+            temp = params["BKG_LIST"]+list(set(params["SIG_LIST"]) | set(params["MISSING_SIG"]))
+            type2id = dict(zip(temp, range(len(temp))))
         print_dict(type2id, "Types")
+        
         dataset = DatasetModule(root_path=params["ROOT_PATH"],
                                 campaigns=params["CAMPAIGN"],
                                 channel=params["CHANNEL"],
@@ -49,7 +53,11 @@ if __name__ == "__main__":
                                 test_rate=params["TEST_SPLIT"],
                                 val_split=params["VAL_SPLIT"],
                                 batch_size=params["BATCH_SIZE"],
-                                id_dict=type2id)
+                                id_dict=type2id,
+                                missing_train=params["MISSING_TRAIN"],
+                                missing_sig=params["MISSING_SIG"],
+                                use_PCA= params["USE_PCA"],
+                                pca_components=params["PCA_COMPONENTS"])
 
         early_stopping, logger, model_checkpoint = None, None, None
         if params["EARLY_STOP"]:
@@ -86,7 +94,7 @@ if __name__ == "__main__":
                       nodes=params["NODES"],
                       dropout=params["DROPOUT"],
                       activation=params["ACTIVATION"],
-                      input_size=len(params["FEATURES"]),
+                      input_size=params["PCA_COMPONENTS"] if params["USE_PCA"] else len(params["FEATURES"]),
                       id_dict=type2id,
                       save_tb_logs=params["SAVE_TB_LOGS"],
                       save_metrics=params["METRICS"],
