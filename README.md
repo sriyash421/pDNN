@@ -37,7 +37,7 @@ pip install -r requirements.txt
 - add root files to {root_path}/merged/{campaigns}/
 ```
 
-### To install required packages :
+### To train :
 ```bash
 python main.py --num_gpus (num_gpus) --config (path to config file)
 ```
