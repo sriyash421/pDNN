@@ -41,3 +41,7 @@ pip install -r requirements.txt
 ```bash
 python main.py --num_gpus (num_gpus) --config (path to config file)
 ```
+
+### Current results on the ZPR channel
+
+![ZPR](assets/report.png)
